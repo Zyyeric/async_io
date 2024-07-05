@@ -1,3 +1,4 @@
+use tokio::fs::OpenOptions;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, Result};
 use std::mem;
@@ -12,7 +13,11 @@ struct TraceEntry {
 }
 
 async fn write_trace(filename: &str, entries: &[TraceEntry]) -> Result<()> {
-    let mut file = File::create(filename).await?;
+    let mut file = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(filename)
+        .await?;
     
     for entry in entries {
         let bytes = unsafe {
@@ -36,7 +41,6 @@ async fn read_trace(filename: &str, max_entries: usize) -> Result<Vec<TraceEntry
         match file.read_exact(&mut buffer).await {
             Ok(_) => {
                 let entry = unsafe {
-                    // This is safe because we know the buffer is exactly the size of TraceEntry
                     std::mem::transmute_copy::<[u8; std::mem::size_of::<TraceEntry>()], TraceEntry>(&buffer)
                 };
                 entries.push(entry);
@@ -57,7 +61,7 @@ async fn main() -> Result<()> {
         TraceEntry { timestamp: 1234567891, obj_id: 2, obj_size: 2048, next_access_vtime: -1 },
     ];
     
-    //write_trace("trace.bin", &entries).await?;
+    write_trace("wiki_2019t.oracleGeneral", &entries).await?;
     println!("Trace written successfully");
     
     let read_entries = read_trace("wiki_2019t.oracleGeneral", 10).await?;
